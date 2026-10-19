@@ -1,0 +1,5 @@
+# Optional: local trained detectors. Large downloads (PyTorch plus models on first use).
+torch>=2.2
+transformers>=4.40
+accelerate>=0.30
+audioseal>=0.1.4
