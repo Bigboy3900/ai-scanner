@@ -128,7 +128,7 @@
 
 <script type="module">
 import { startEngine, scanFile, scanText } from "./app.js";
-import { authEnabled, providers, currentUser, onAuthChange, sendEmailLink, signInWith, signOut } from "./auth.js";
+import { authEnabled, enabledProviders, currentUser, onAuthChange, sendEmailLink, signInWith, signOut } from "./auth.js";
 const $ = (s) => document.querySelector(s);
 const fileInput = $("#file"), drop = $("#drop");
 let chosen = null;
@@ -137,7 +137,7 @@ const DROP_HINT = "Images, audio, video, PDF, Word, PowerPoint, text";
 const canUseFiles = () => !authEnabled || Boolean(user);
 
 // ---- accounts
-const PROVIDER_NAMES = { apple: "Apple", google: "Google", github: "GitHub", discord: "Discord" };
+const PROVIDER_NAMES = { apple: "Apple", google: "Google", github: "GitHub" };
 
 function renderAccount() {
   const box = $("#account");
@@ -172,11 +172,14 @@ function openSignIn() {
 $("#signin-close").onclick = () => $("#signin").close();
 $("#signin").addEventListener("click", (e) => { if (e.target === $("#signin")) $("#signin").close(); });
 
-$("#providers").innerHTML = providers.map((p) =>
-  `<button class="btn-ghost" data-provider="${p}">Continue with ${PROVIDER_NAMES[p] || p}</button>`).join("");
-$("#providers").querySelectorAll("button").forEach((b) => b.onclick = async () => {
-  try { await signInWith(b.dataset.provider); }
-  catch (e) { $("#signin-msg").innerHTML = `<span class="err">${esc(e.message)}</span>`; }
+enabledProviders().then((providers) => {
+  $(".divider").hidden = !providers.length;
+  $("#providers").innerHTML = providers.map((p) =>
+    `<button class="btn-ghost" data-provider="${p}">Continue with ${PROVIDER_NAMES[p] || p}</button>`).join("");
+  $("#providers").querySelectorAll("button").forEach((b) => b.onclick = async () => {
+    try { await signInWith(b.dataset.provider); }
+    catch (e) { $("#signin-msg").innerHTML = `<span class="err">${esc(e.message)}</span>`; }
+  });
 });
 
 $("#email-form").onsubmit = async (e) => {

@@ -4,7 +4,7 @@ Drop in any file (text, image, audio, video, PDF, Word, PowerPoint) and it check
 
 **Try it: https://bigboy3900.github.io/ai-scanner/** (runs entirely in your browser; files are never uploaded)
 
-Pasting text works without an account. Scanning files needs a free account (email sign-in link, Apple, Google, GitHub or Discord); see [AUTH_SETUP.md](AUTH_SETUP.md) to switch accounts on.
+Pasting text works without an account. Scanning files needs a free account (email sign-in link, Apple, Google or GitHub); setup notes are in [AUTH_SETUP.md](AUTH_SETUP.md).
 
 ## Two versions
 

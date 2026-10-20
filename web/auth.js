@@ -1,10 +1,23 @@
-// Accounts via Supabase Auth: passwordless email links plus Apple, Google, GitHub and Discord.
+// Accounts via Supabase Auth: passwordless email links plus Apple, Google and GitHub.
 // The page is static, so this gate is a convenience, not security: the scanner code itself is public.
 
 import { PROVIDERS, SUPABASE_ANON_KEY, SUPABASE_URL } from "./config.js";
 
 export const authEnabled = Boolean(SUPABASE_URL && SUPABASE_ANON_KEY);
-export const providers = PROVIDERS;
+
+// The providers from PROVIDERS that are switched on in Supabase, so unfinished ones never show a broken button.
+// If the settings can't be read, show them all and let Supabase report the problem on click.
+export async function enabledProviders() {
+  if (!authEnabled) return [];
+  try {
+    const res = await fetch(`${SUPABASE_URL}/auth/v1/settings`, { headers: { apikey: SUPABASE_ANON_KEY } });
+    if (!res.ok) throw new Error(res.status);
+    const { external = {} } = await res.json();
+    return PROVIDERS.filter((p) => external[p]);
+  } catch {
+    return PROVIDERS;
+  }
+}
 
 let client = null;
 
