@@ -4,6 +4,8 @@ Drop in any file (text, image, audio, video, PDF, Word, PowerPoint) and it check
 
 **Try it: https://bigboy3900.github.io/ai-scanner/** (runs entirely in your browser; files are never uploaded)
 
+Pasting text works without an account. Scanning files needs a free account (email sign-in link, Apple, Google, GitHub or Discord); see [AUTH_SETUP.md](AUTH_SETUP.md) to switch accounts on.
+
 ## Two versions
 
 - **Website (GitHub Pages):** the same Python checks, run in the browser with [Pyodide](https://pyodide.org). The browser decodes audio and video and reads Content Credentials with [c2pa-web](https://github.com/contentauth/c2pa-js). It can't run the trained AI models or paid APIs. Source in `web/`, assembled by `tools/build_site.py`, deployed by `.github/workflows/pages.yml` on every push to `main`.

@@ -59,16 +59,42 @@
   @keyframes spin { to { transform: rotate(360deg); } }
   .err { color: var(--ai); }
   a { color: var(--accent); }
+  .top { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 4px; }
+  .top h1 { margin: 0; }
+  #account { display: flex; align-items: center; gap: 10px; font-size: 14px; min-width: 0; }
+  #account .who { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 220px; }
+  .btn-ghost { background: transparent; color: var(--text); border: 1px solid var(--border); padding: 7px 14px; font-weight: 600; }
+  .btn-ghost:hover { border-color: var(--muted); }
+  #drop.locked { cursor: pointer; border-style: solid; background: var(--neutral-soft); }
+  #drop.locked strong { color: var(--text); }
+  dialog { border: 1px solid var(--border); border-radius: 14px; padding: 0; background: var(--panel); color: var(--text);
+           width: min(400px, calc(100vw - 32px)); box-shadow: 0 20px 60px rgba(0,0,0,.25); }
+  dialog::backdrop { background: rgba(0,0,0,.45); }
+  .dlg { padding: 24px; display: grid; gap: 12px; }
+  .dlg h2 { margin: 0; font-size: 20px; }
+  .dlg p { margin: 0; }
+  .dlg input[type=email] { width: 100%; padding: 11px 12px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg);
+                           color: var(--text); font: inherit; }
+  .dlg form { display: grid; gap: 10px; }
+  .divider { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 13px; }
+  .divider::before, .divider::after { content: ""; flex: 1; height: 1px; background: var(--border); }
+  .providers { display: grid; gap: 8px; }
+  .providers button { width: 100%; }
+  .close { position: absolute; top: 10px; right: 12px; background: none; color: var(--muted); font-size: 22px; padding: 4px 8px; }
+  .ok { color: var(--human); }
 </style>
 </head>
 <body>
 <main>
-  <h1>AI Scanner</h1>
+  <div class="top">
+    <h1>AI Scanner</h1>
+    <div id="account"></div>
+  </div>
   <p class="sub">Drop in text, an image, audio, video or a document. It checks provenance, watermarks and forensic traces, and shows the evidence behind the verdict. Everything runs in your browser: your files are never uploaded.</p>
 
   <div class="panel">
     <div id="drop" tabindex="0">
-      <strong>Choose a file</strong> or drag it here
+      <strong id="drop-title">Choose a file</strong><span id="drop-sub"> or drag it here</span>
       <div class="muted" id="fname">Images, audio, video, PDF, Word, PowerPoint, text</div>
       <input type="file" id="file" hidden>
     </div>
@@ -85,33 +111,128 @@
   <a href="https://github.com/Bigboy3900/ai-scanner">Source on GitHub</a></p>
 </main>
 
+<dialog id="signin" aria-labelledby="signin-title">
+  <button class="close" id="signin-close" aria-label="Close">×</button>
+  <div class="dlg" id="signin-body">
+    <h2 id="signin-title">Sign in</h2>
+    <p class="muted">An account lets you scan images, audio, video and documents. No password needed.</p>
+    <form id="email-form">
+      <input type="email" id="email" placeholder="you@example.com" autocomplete="email" required>
+      <button type="submit">Email me a sign-in link</button>
+    </form>
+    <div class="divider">or</div>
+    <div class="providers" id="providers"></div>
+    <div id="signin-msg" class="muted"></div>
+  </div>
+</dialog>
+
 <script type="module">
 import { startEngine, scanFile, scanText } from "./app.js";
+import { authEnabled, providers, currentUser, onAuthChange, sendEmailLink, signInWith, signOut } from "./auth.js";
 const $ = (s) => document.querySelector(s);
 const fileInput = $("#file"), drop = $("#drop");
 let chosen = null;
+let user = null;
+const DROP_HINT = "Images, audio, video, PDF, Word, PowerPoint, text";
+const canUseFiles = () => !authEnabled || Boolean(user);
 
-drop.onclick = () => fileInput.click();
-drop.onkeydown = (e) => { if (e.key === "Enter" || e.key === " ") fileInput.click(); };
+// ---- accounts
+const PROVIDER_NAMES = { apple: "Apple", google: "Google", github: "GitHub", discord: "Discord" };
+
+function renderAccount() {
+  const box = $("#account");
+  if (!authEnabled) { box.innerHTML = ""; }
+  else if (user) {
+    box.innerHTML = `<span class="who" title="${esc(user.email || "")}">${esc(user.email || user.user_metadata?.full_name || "Signed in")}</span>
+      <button class="btn-ghost" id="signout">Sign out</button>`;
+    $("#signout").onclick = async () => { await signOut(); user = null; renderAccount(); };
+  } else {
+    box.innerHTML = `<button class="btn-ghost" id="signin-open">Sign in</button>`;
+    $("#signin-open").onclick = openSignIn;
+  }
+  if (canUseFiles()) {
+    drop.classList.remove("locked");
+    $("#drop-title").textContent = "Choose a file";
+    $("#drop-sub").textContent = " or drag it here";
+    if (!chosen) $("#fname").textContent = DROP_HINT;
+  } else {
+    drop.classList.add("locked");
+    clearFile();
+    $("#drop-title").textContent = "Sign in to scan files";
+    $("#drop-sub").textContent = "";
+    $("#fname").textContent = "Pasting text works without an account. Images, audio, video and documents need a free account.";
+  }
+}
+
+function openSignIn() {
+  $("#signin-msg").textContent = "";
+  $("#signin").showModal();
+  $("#email").focus();
+}
+$("#signin-close").onclick = () => $("#signin").close();
+$("#signin").addEventListener("click", (e) => { if (e.target === $("#signin")) $("#signin").close(); });
+
+$("#providers").innerHTML = providers.map((p) =>
+  `<button class="btn-ghost" data-provider="${p}">Continue with ${PROVIDER_NAMES[p] || p}</button>`).join("");
+$("#providers").querySelectorAll("button").forEach((b) => b.onclick = async () => {
+  try { await signInWith(b.dataset.provider); }
+  catch (e) { $("#signin-msg").innerHTML = `<span class="err">${esc(e.message)}</span>`; }
+});
+
+$("#email-form").onsubmit = async (e) => {
+  e.preventDefault();
+  const email = $("#email").value.trim();
+  const btn = e.target.querySelector("button");
+  btn.disabled = true;
+  try {
+    await sendEmailLink(email);
+    $("#signin-msg").innerHTML = `<span class="ok">Check your inbox. We sent a sign-in link to ${esc(email)}.</span>`;
+  } catch (err) {
+    $("#signin-msg").innerHTML = `<span class="err">Couldn't send the link: ${esc(err.message)}</span>`;
+  } finally {
+    btn.disabled = false;
+  }
+};
+
+async function initAuth() {
+  // Errors from an expired or reused email link come back in the URL.
+  const params = new URLSearchParams(location.hash.slice(1) + "&" + location.search.slice(1));
+  const linkError = params.get("error_description");
+  user = await currentUser();
+  if (params.has("code") || params.has("access_token") || linkError) history.replaceState(null, "", location.pathname);
+  renderAccount();
+  if (linkError && !user) { openSignIn(); $("#signin-msg").innerHTML = `<span class="err">${esc(linkError)}. Try again.</span>`; }
+  onAuthChange((u) => { user = u; renderAccount(); if (u && $("#signin").open) $("#signin").close(); });
+}
+
+// ---- file picking
+function clearFile() {
+  chosen = null;
+  fileInput.value = "";
+}
+
+drop.onclick = () => (canUseFiles() ? fileInput.click() : openSignIn());
+drop.onkeydown = (e) => { if (e.key === "Enter" || e.key === " ") drop.onclick(); };
 fileInput.onchange = () => choose(fileInput.files[0]);
 ["dragenter", "dragover"].forEach((t) => drop.addEventListener(t, (e) => { e.preventDefault(); drop.classList.add("over"); }));
 ["dragleave", "drop"].forEach((t) => drop.addEventListener(t, (e) => { e.preventDefault(); drop.classList.remove("over"); }));
-drop.addEventListener("drop", (e) => choose(e.dataTransfer.files[0]));
+drop.addEventListener("drop", (e) => (canUseFiles() ? choose(e.dataTransfer.files[0]) : openSignIn()));
 document.addEventListener("paste", (e) => {
   const f = [...(e.clipboardData?.files || [])][0];
-  if (f) choose(f);
+  if (f && canUseFiles()) choose(f);
+  else if (f) openSignIn();
 });
 
 $("#text").addEventListener("input", () => {
   if (chosen && $("#text").value.trim()) {
-    chosen = null;
-    fileInput.value = "";
-    $("#fname").textContent = "Images, audio, video, PDF, Word, PowerPoint, text";
+    clearFile();
+    $("#fname").textContent = DROP_HINT;
   }
 });
 
 function choose(f) {
   if (!f) return;
+  if (!canUseFiles()) { openSignIn(); return; }
   chosen = f;
   $("#text").value = "";
   $("#fname").textContent = `${f.name} (${(f.size / 1024 / 1024).toFixed(2)} MB)`;
@@ -123,7 +244,8 @@ const setStatus = (msg) => {
 
 $("#go").onclick = async () => {
   const text = $("#text").value.trim();
-  if (!chosen && !text) { $("#status").textContent = "Add a file or some text first."; return; }
+  if (!chosen && !text) { $("#status").textContent = canUseFiles() ? "Add a file or some text first." : "Paste some text first."; return; }
+  if (chosen && !canUseFiles()) { openSignIn(); return; }
   $("#go").disabled = true;
   $("#result").innerHTML = "";
   try {
@@ -186,6 +308,7 @@ function sigHtml(s) {
         <div>${esc(s.explanation)}</div>${hl}${vis}</div>
     </div>`;
 }
+initAuth().catch((e) => console.error("sign-in setup failed", e));
 startEngine(setStatus).catch((e) => { $("#status").innerHTML = `<span class="err">Could not load the scanner: ${esc(e.message)}</span>`; });
 </script>
 </body>
