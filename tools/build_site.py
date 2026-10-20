@@ -31,6 +31,7 @@ def main() -> None:
         if rel in ("scanner/web.py", "scanner/__main__.py"):
             continue  # server and CLI only
         files.append(rel)
+    files += sorted(p.relative_to(ROOT).as_posix() for p in (ROOT / "scanner" / "models").glob("*.json"))
     files.append("glue.py")
     for rel in files:
         src = ROOT / "web" / rel if rel == "glue.py" else ROOT / rel

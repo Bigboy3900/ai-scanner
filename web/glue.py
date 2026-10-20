@@ -35,4 +35,12 @@ def scan_for_js(data_js, name, decoded_js=None):
         if d.get("burst"):
             decoded["burst"] = [bytes(png) for png in d["burst"]]
     report = scan_bytes(_bytes(data_js), name, decoded=decoded)
+    _hide_unavailable(report)
     return json.dumps(report, default=str)
+
+
+def _hide_unavailable(report):
+    """Local models and paid APIs can't run in the browser at all; don't list them as skipped checks."""
+    report["skipped"] = [s for s in report["skipped"] if not s["analyzer"].startswith(("ml_", "api_"))]
+    for part in report["parts"]:
+        _hide_unavailable(part)

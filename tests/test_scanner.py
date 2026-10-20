@@ -118,3 +118,23 @@ def test_web_api():
     r = c.post("/api/scan", files={"file": ("x.png", png_bytes(np.zeros((128, 128, 3), np.uint8)), "image/png")})
     assert r.status_code == 200 and r.json()["kind"] == "image"
     assert c.post("/api/scan").status_code == 400
+
+
+def test_style_model_flags_ai_essay():
+    # Held out from training: an AI-written essay that avoids the classic buzzwords.
+    r = scan_text(open("tests/data/ai_essay_washington.txt").read())
+    sig = next(s for s in r["signals"] if s["analyzer"] == "text_style_model")
+    assert sig["score"] > 0.7
+    assert r["verdict"]["band"] in ("likely_ai", "possibly_ai")
+
+
+def test_style_model_does_not_flag_human_prose():
+    r = scan_text(open("tests/data/human_chesterton.txt").read())
+    assert r["verdict"]["ai_probability"] < 0.5
+
+
+def test_us_abbreviation_is_not_casual_writing():
+    text = ("The U.S. Constitution was drafted in 1787. " * 3 + "It set out the structure of the federal government "
+            "and the powers of each branch, and it has been amended twenty-seven times since then. ") * 3
+    r = scan_text(text)
+    assert not any(s["name"] == "Casual, unpolished writing" for s in r["signals"])

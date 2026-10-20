@@ -1,3 +1,3 @@
 """Importing this package registers every analyzer."""
 
-from . import provenance, text, image, audio, video, document, ml, apis  # noqa: F401
+from . import provenance, text, text_style, image, audio, video, document, ml, apis  # noqa: F401

@@ -40,7 +40,7 @@ cp .env.example .env                 # add paid API keys (Hive, Sightengine, GPT
 |---|---|---|
 | Provenance | C2PA Content Credentials (signature validated), IPTC "AI-generated" source type, generator names and prompts in metadata, camera EXIF | all files |
 | Watermarks | Stable Diffusion invisible watermark, Meta AudioSeal (with extras) | image, audio |
-| Text | AI-typical vocabulary, chatbot boilerplate, sentence rhythm (burstiness), vocabulary variety, formatting habits, hidden Unicode characters; Binoculars and a trained classifier (with extras); GPTZero (with key) | text, and text inside documents |
+| Text | Trained writing-style model (function words, sentence rhythm, punctuation habits; runs everywhere, including the website), AI-typical vocabulary, chatbot boilerplate, formatting habits, hidden Unicode characters; Binoculars and a Hugging Face classifier (with extras); GPTZero (with key) | text, and text inside documents |
 | Image forensics | Fourier spectrum peaks from upsampling, high-frequency falloff, sensor noise vs. brightness, JPEG quantization tables, generator-typical sizes; trained classifiers (with extras); Hive / Sightengine (with keys) | images, document images, video frames |
 | Audio forensics | Hard bandwidth cutoffs from 16-24 kHz generators, digitally clean pauses, pause timing; deepfake-voice classifier (with extras) | audio, video soundtracks |
 | Video | Texture "swimming" after motion compensation, detail flicker, generator-typical lengths, phone camera tags, missing audio; plus all image checks on frames and audio checks on the soundtrack | video |
@@ -61,6 +61,10 @@ Verdicts: Verified AI, Likely AI, Possibly AI, Inconclusive, Possibly human-made
 - Text detection is easy to beat (paraphrasing, editing) and over-flags non-native and formal writers.
 - Screenshots, resizing and recompression erase most image and audio traces.
 - A missing watermark or missing metadata proves nothing.
+
+## The writing-style model
+
+`scanner/models/text_style.json` is a small logistic-regression model trained by `tools/train_text_style.py` on public human-written corpora (news, fiction, speeches, reviews, forum posts from nltk_data) and the AI-written samples in `tools/data/ai_texts/`. In cross-validation it catches about 82% of AI-written 200-word sections while flagging about 1.7% of human ones; whole documents do better because sections are combined. Its human data has no modern student essays and its AI data comes mainly from one model family, so add samples from other chatbots (and real student writing) to `tools/data/` and re-run the script to improve it.
 
 ## Adding a detector
 

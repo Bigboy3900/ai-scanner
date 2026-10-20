@@ -34,9 +34,10 @@ ASSISTANT_BOILERPLATE = [
     "great question", "feel free to", "let me know if you", "here's a", "here is a", "i'd be happy to",
     "i'm sorry, but", "happy to help", "knowledge cutoff", "i cannot browse", "regenerate response",
 ]
+# Case-sensitive on purpose: "U.S." or a sentence starting with "I" are not informal.
 HUMAN_MARKERS = re.compile(
-    r"(\blol\b|\blmao\b|\bidk\b|\btbh\b|\bimo\b|\bgonna\b|\bwanna\b|\bkinda\b|\bya\b|\bu\b|!!+|\?\?+|\.\.\.\s*[a-z]|"
-    r"(?:^|[.!?]\s+)i\s|\bi'm\b(?=\s+[a-z]+\s+lol)|:\)|:\(|\bhaha\b)", re.I | re.M)
+    r"(\b(?:lol|LOL|lmao|idk|tbh|imo|gonna|wanna|kinda|ya|haha)\b|\bu\b(?!\.)|!!+|\?\?+|\.\.\.\s*[a-z]|"
+    r"(?:^|[.!?]\s+)i\s|\bi'm\b|:\)|:\()", re.M)
 BOM = "\ufeff"
 HIDDEN_CHARS = {
     "\u200b": "zero-width space", "\u200c": "zero-width non-joiner", "\u200d": "zero-width joiner",
@@ -72,7 +73,8 @@ def wording(item: Item) -> list[Signal]:
             hits[p] = n
     per_k = 1000 * sum(hits.values()) / len(w)
     # Human prose typically sits around 2-6 per 1000 words on this list; chat output often 15+.
-    score = clamp(0.5 + (per_k - 7) / 30, 0.2, 0.9)
+    # One-sided: lots of these words hints at AI, but their absence says little (modern models avoid them).
+    score = clamp(0.5 + (per_k - 7) / 30, 0.45, 0.9)
     out = [Signal("text_wording", "AI-typical vocabulary", score, WEAK,
                   f"{sum(hits.values())} AI-typical words or phrases ({per_k:.1f} per 1,000 words). "
                   f"Most frequent: {', '.join(sorted(hits, key=hits.get, reverse=True)[:6]) or 'none'}.",
@@ -99,14 +101,6 @@ def rhythm(item: Item) -> list[Signal]:
                   f"Sentence lengths vary by {cv:.2f} (coefficient of variation, mean {mean:.0f} words). "
                   "Human writing tends to swing more between short and long sentences.",
                   {"cv": round(cv, 3), "mean_len": round(mean, 1), "n_sentences": len(sents)})]
-    # Moving-average type-token ratio over 100-word windows, so length doesn't skew it.
-    lw = [x.lower() for x in w]
-    win = 100
-    if len(lw) >= win:
-        ttrs = [len(set(lw[i:i + win])) / win for i in range(0, len(lw) - win + 1, 25)]
-        mattr = statistics.mean(ttrs)
-        out.append(Signal("text_rhythm", "Vocabulary variety", clamp(0.5 + (0.66 - mattr) * 2, 0.3, 0.7), WEAK,
-                          f"Average unique-word ratio per 100 words is {mattr:.2f}.", {"mattr": round(mattr, 3)}))
     return out
 
 
